@@ -1,0 +1,67 @@
+--Scenario
+A table contains an ID with leading zeros; this ID column exists in another table without a leading zero. When joining, this has to be trimmed to ensure equality. 
+I noted there was a function that does trimming the leading zero which was causing a performance issue. 
+
+Option 1: Change the query with a wild card: the easiest way
+SELECT ...
+FROM YourTable tbl
+WHERE dbo.udf_trimleadingzerosfromid(id) = @filteredid --OLD
+SELECT id, TRIM(LEADING '0' FROM id) AS TrimmedID FROM dbo.YourTable;
+
+WHERE tbl.id LIKE '%' + @filteredid 
+
+LTRIM(REPLACE(tbl.id, '0', ''))
+
+SELECT TRIM(LEADING '0' FROM ID) AS TrimmedDonorID, *
+INTO #TempTrimmed
+FROM YourTable;
+
+-- USE THIS
+select  COL1, COL2, COL3, ID --, dbo.udf_TrimLeadingZeros(ID) FNtRIMMEDID
+,TRIM(LEADING '0' FROM ID) AS TrimmedDonorID
+  from TABLE d 
+  --WHERE   DBO.udf_TrimLeadingZeros(ExternalDonorID) =  @fILTEREDID
+  WHERE  TRIM(LEADING '0' FROM ID) = @fILTEREDID
+
+
+--YOU CAN UPDATE THE TABLE
+UPDATE YourTable
+SET TrimmedID = TRIM(LEADING '0' FROM ID);
+
+
+HERE IS THE FUNCTION: IT REMOVE THE LEADING ZERO, KEEPS LOOPING UNTILL ALL ZEROS ARE REMOVED. 
+WHILE (LEFT(@returnValue, 1) = '0') BEGIN SET @returnValue = SUBSTRING(@returnValue, 2, LEN(@returnValue)); END RETURN @returnValue;
+Create FUNCTION [dbo].[udf_TrimLeadingZeros]
+(@value NVARCHAR(100))
+RETURNS NVARCHAR(100)
+AS
+BEGIN
+    DECLARE @returnValue NVARCHAR(100) = @value;
+	WHILE (LEFT(@returnValue, 1) = '0')
+    BEGIN SET @returnValue = SUBSTRING(@returnValue, 2, LEN(@returnValue));
+    END
+RETURN @returnValue;
+END
+
+--
+
+
+Option 2: add a column
+
+-- Add a Computed Column:
+ 
+ALTER TABLE TableName
+ADD TrimmedID AS TRIM(LEADING '0' FROM IDcolumn) PERSISTED;
+
+-- Create an Index:
+ 
+CREATE INDEX IX_YourTable_TrimmedID
+ON YourTable (TrimmedID);
+
+--Rewrite the Query:
+If there is a UDF that does trimming and is referenced in a query, then substitute it 
+SELECT ...
+FROM YourTable tbl
+WHERE 
+--dbo.udf_trimleadingzerosfromid(id) = @filteredid --OLD
+tbl.TrimmedID = @filteredid; --NEW
