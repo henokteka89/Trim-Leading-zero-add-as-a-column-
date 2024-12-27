@@ -1,0 +1,75 @@
+IF OBJECT_ID('dbo.computedwithpersisted', 'U') IS NOT NULL
+    DROP TABLE dbo.computedwithpersisted;
+GO
+
+CREATE TABLE dbo.computedwithpersisted
+(
+    id INT IDENTITY(1,1) NOT NULL,
+    employeeid VARCHAR(20) NOT NULL,
+    Fname VARCHAR(40) NOT NULL
+)
+--Adding a computed column (with Persisted, it is automatically updated)
+ Alter table computedwithpersisted
+ ADD TRIMMEDEMPLOYEEID AS TRIM(LEADING '0' FROM employeeid) PERSISTED;
+
+-- insert a million record
+SET NOCOUNT ON;  -- Helps speed up by not returning rowcount messages.
+
+DECLARE @counter INT = 1;
+DECLARE @maxRows INT = 1000000;  -- 1 million
+DECLARE @zeroCount INT;
+DECLARE @employeeid VARCHAR(20);
+DECLARE @fname VARCHAR(40);
+
+WHILE (@counter <= @maxRows)
+BEGIN
+    -- Randomly choose how many leading zeros (0 to 4).
+    -- RAND() returns a float between 0 and 1. Multiply by 5 yields 0 to <5, 
+    -- and use FLOOR() or CAST() to get an integer in [0..4].
+    SET @zeroCount = CAST(FLOOR(RAND() * 5) AS INT);
+
+    -- Convert @counter to string and prepend zeros based on @zeroCount.
+    SET @employeeid = REPLICATE('0', @zeroCount) + CAST(@counter AS VARCHAR(10));
+
+    -- Create a basic Fname (you can do anything else here).
+    SET @fname = 'Name-' + CAST(@counter AS VARCHAR(10));
+
+    -- Insert row
+    INSERT INTO dbo.computedwithpersisted (employeeid, Fname)
+    VALUES (@employeeid, @fname);
+
+    SET @counter = @counter + 1;
+END;
+GO
+
+-- Index the table 
+CREATE NONCLUSTERED INDEX [NCI_Trimmed]
+ON [dbo].[computedwithpersisted] ([TRIMMEDEMPLOYEEID])
+with (data_compression = page)
+CREATE NONCLUSTERED INDEX [NCI_empid]
+ON [dbo].[computedwithpersisted] ([TRIMMEDEMPLOYEEID])
+with (data_compression = page)
+
+
+-- I have this UDF that trims leading zeros from employeeid
+
+CREATE FUNCTION [dbo].[udf_removeleadingzeros]
+(@value NVARCHAR(100))
+RETURNS NVARCHAR(100)
+AS
+BEGIN
+    DECLARE @returnValue NVARCHAR(100) = @value;
+
+    WHILE (LEFT(@returnValue, 1) = '0')
+    BEGIN
+        SET @returnValue = SUBSTRING(@returnValue, 2, LEN(@returnValue));
+    END
+
+    RETURN @returnValue;
+END
+GO
+
+-- Test how this scalar UDF impacts searches
+SELECT distinct * FROM computedwithpersisted where dbo.udf_TrimLeadingZeros(employeeid) = '574'  --around 15 sec
+		SELECT distinct * FROM computedwithpersisted where trim(leading '0' from employeeid) = '574'  --around a second
+		SELECT distinct * FROM computedwithpersisted where trimmedemployeeid  = '574'                 --0
