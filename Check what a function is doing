@@ -1,0 +1,11 @@
+/*
+What's the function doing now?
+*/
+SELECT OBJECT_NAME(defs.object_id) AS function_name,
+       defs.execution_count,
+       defs.total_worker_time / 1000. AS total_worker_time,
+       defs.total_logical_reads,
+       defs.total_elapsed_time / 1000. AS total_elapsed_time
+FROM sys.dm_exec_function_stats AS defs
+where OBJECT_NAME(defs.object_id)  like '%fn%' or OBJECT_NAME(defs.object_id)  like '%udf%'
+order by execution_count desc
