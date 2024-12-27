@@ -70,6 +70,6 @@ END
 GO
 
 -- Test how this scalar UDF impacts searches
-SELECT distinct * FROM computedwithpersisted where dbo.udf_TrimLeadingZeros(employeeid) = '574'  --around 15 sec
+SELECT distinct * FROM computedwithpersisted where dbo.udf_removeleadingzeros(employeeid) = '574'  --around 15 sec
 		SELECT distinct * FROM computedwithpersisted where trim(leading '0' from employeeid) = '574'  --around a second
 		SELECT distinct * FROM computedwithpersisted where trimmedemployeeid  = '574'                 --0
